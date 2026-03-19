@@ -567,7 +567,9 @@ function runLoop(){
 
 // ── Start / End ────────────────────────────────────────────────────────────────
 function startGame(){
-  try{resumeAudio();}catch(e){}
+  try{
+    if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
+  }catch(e){}
   playerName=document.getElementById('playerName').value.trim()||'Capitán';
   score=0;lives=3;frame=0;level=1;speed=3;spawnTimer=0;spawnInterval=80;currentObstacleWeight=0.3;
   invincible=0;combo=0;comboTimer=0;nextLifeAt=5000;
