@@ -567,9 +567,7 @@ function runLoop(){
 
 // ── Start / End ────────────────────────────────────────────────────────────────
 function startGame(){
-  try{
-    if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
-  }catch(e){}
+  resumeAudio();
   playerName=document.getElementById('playerName').value.trim()||'Capitán';
   score=0;lives=3;frame=0;level=1;speed=3;spawnTimer=0;spawnInterval=80;currentObstacleWeight=0.3;
   invincible=0;combo=0;comboTimer=0;nextLifeAt=5000;
@@ -718,3 +716,7 @@ document.getElementById('muteBtn').addEventListener('click',function(){
 // ── Start button ──────────────────────────────────────────────────────────────
 document.getElementById('startBtn').addEventListener('click',function(e){
   e.preventDefault();e.stopPropagation();startGame();
+});
+</script>
+</body>
+</html>
