@@ -1,181 +1,193 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
-<title>Lancha Loca</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-html,body{
-  margin:0;
-  padding:0;
-  overflow:hidden;
-  background:#021e2f;
-  touch-action:none;
-}
-
-#hud{
+body{margin:0;overflow:hidden;background:#021e2f;font-family:sans-serif}
+#hud{position:absolute;top:10px;left:10px;color:#fff}
+#start{
   position:absolute;
-  top:10px;
-  left:10px;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
   color:white;
-  font-family:sans-serif;
-  font-size:14px;
+  font-size:22px;
 }
 </style>
 </head>
-
 <body>
 
 <canvas id="game"></canvas>
 
 <div id="hud">
-  Puntos: <span id="score">0</span><br>
-  Nivel: 1<br>
-  ❤️ 3
+Puntos: <span id="score">0</span><br>
+❤️ <span id="lives">3</span>
 </div>
 
+<div id="start">TOCAR PARA EMPEZAR</div>
+
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const c = document.getElementById("game");
+const ctx = c.getContext("2d");
 
 let DPR = window.devicePixelRatio || 1;
 let W,H;
 
 function resize(){
-  W = window.innerWidth;
-  H = window.innerHeight;
-
-  canvas.style.width = W + "px";
-  canvas.style.height = H + "px";
-
-  canvas.width = W * DPR;
-  canvas.height = H * DPR;
-
+  W = innerWidth;
+  H = innerHeight;
+  c.width = W*DPR;
+  c.height = H*DPR;
+  c.style.width = W+"px";
+  c.style.height = H+"px";
   ctx.setTransform(DPR,0,0,DPR,0,0);
 }
 resize();
-window.addEventListener("resize", resize);
+addEventListener("resize",resize);
 
-// ─── GAME ─────────────────────────
-let score = 0;
-let items = [];
-let frame = 0;
+// ─── GAME ─────────────────────
+let started=false;
+let score=0,lives=3;
+let items=[];
+let frame=0;
 
-const boat = {
-  x: W/2,
-  y: H-120,
-  vx:0
+const boat={
+  x:W/2,
+  y:H-120,
+  vx:0,vy:0
 };
 
-// ─── INPUT TOUCH (IPHONE) ─────────
-let touchX = null;
+// ─── INPUT TOUCH ─────────────
+let tx=null,ty=null;
 
-window.addEventListener("touchstart", e=>{
-  touchX = e.touches[0].clientX;
+addEventListener("touchstart",e=>{
+  tx=e.touches[0].clientX;
+  ty=e.touches[0].clientY;
+  if(!started){
+    started=true;
+    document.getElementById("start").style.display="none";
+  }
 });
 
-window.addEventListener("touchmove", e=>{
-  touchX = e.touches[0].clientX;
+addEventListener("touchmove",e=>{
+  tx=e.touches[0].clientX;
+  ty=e.touches[0].clientY;
 });
 
-window.addEventListener("touchend", ()=>{
-  touchX = null;
+addEventListener("touchend",()=>{
+  tx=null;ty=null;
 });
 
-// ─── SPAWN ────────────────────────
+// ─── SPAWN ───────────────────
 function spawn(){
-  items.push({
-    x: Math.random()*W,
-    y: -20,
-    vy: 3,
-    r: 8
-  });
+  let type=Math.random();
+
+  if(type<0.7){
+    items.push({
+      type:"fish",
+      x:Math.random()*W,
+      y:-20,
+      vy:2+Math.random()*2
+    });
+  }else{
+    items.push({
+      type:"rock",
+      x:Math.random()*W,
+      y:-20,
+      vy:3
+    });
+  }
 }
 
-// ─── UPDATE ───────────────────────
+// ─── UPDATE ─────────────────
 function update(){
+  if(!started)return;
+
   frame++;
+  if(frame%40===0)spawn();
 
-  if(frame%30===0) spawn();
-
-  // mover lancha con touch
-  if(touchX !== null){
-    let dx = touchX - boat.x;
-    boat.vx += dx * 0.01;
+  if(tx!==null){
+    boat.vx+=(tx-boat.x)*0.01;
+    boat.vy+=(ty-boat.y)*0.01;
   }
 
-  boat.vx *= 0.9;
-  boat.x += boat.vx;
+  boat.vx*=0.9;
+  boat.vy*=0.9;
+  boat.x+=boat.vx;
+  boat.y+=boat.vy;
 
-  // límites
-  boat.x = Math.max(30, Math.min(W-30, boat.x));
+  boat.x=Math.max(30,Math.min(W-30,boat.x));
+  boat.y=Math.max(60,Math.min(H-60,boat.y));
 
-  // objetos
-  items.forEach(o=>{
-    o.y += o.vy;
-  });
+  items.forEach(o=>o.y+=o.vy);
 
-  // colisiones
-  items = items.filter(o=>{
-    let hit = Math.abs(o.x - boat.x) < 20 &&
-              Math.abs(o.y - boat.y) < 20;
+  items=items.filter(o=>{
+    let hit=Math.abs(o.x-boat.x)<25&&Math.abs(o.y-boat.y)<25;
 
     if(hit){
-      score += 10;
-      document.getElementById("score").textContent = score;
+      if(o.type==="fish"){
+        score+=10;
+      }else{
+        lives--;
+      }
+      document.getElementById("score").textContent=score;
+      document.getElementById("lives").textContent=lives;
       return false;
     }
 
-    return o.y < H+20;
+    return o.y<H+20;
   });
 }
 
-// ─── DRAW ─────────────────────────
+// ─── DRAW ──────────────────
 function draw(){
-  // fondo agua
-  let grad = ctx.createLinearGradient(0,0,0,H);
-  grad.addColorStop(0,"#06364d");
-  grad.addColorStop(1,"#021e2f");
-  ctx.fillStyle = grad;
+  // agua
+  let g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,"#06364d");
+  g.addColorStop(1,"#021e2f");
+  ctx.fillStyle=g;
   ctx.fillRect(0,0,W,H);
 
   // olas
-  ctx.strokeStyle = "rgba(255,255,255,0.1)";
+  ctx.strokeStyle="rgba(255,255,255,0.1)";
   ctx.beginPath();
   for(let i=0;i<W;i+=10){
-    ctx.lineTo(i, H/2 + Math.sin(i*0.02 + frame*0.05)*5);
+    ctx.lineTo(i,H/2+Math.sin(i*0.02+frame*0.05)*5);
   }
   ctx.stroke();
 
-  // peces (visibles)
+  // peces
   items.forEach(o=>{
-    ctx.fillStyle="#2ee6c5";
-    ctx.beginPath();
-    ctx.arc(o.x,o.y,o.r,0,Math.PI*2);
-    ctx.fill();
+    if(o.type==="fish"){
+      ctx.fillStyle="#2ee6c5";
+      ctx.beginPath();
+      ctx.ellipse(o.x,o.y,12,6,0,0,Math.PI*2);
+      ctx.fill();
+    }else{
+      ctx.fillStyle="#888";
+      ctx.fillRect(o.x-10,o.y-10,20,20);
+    }
   });
 
-  // LANCHA (GRANDE Y VISIBLE)
-  ctx.fillStyle="white";
+  // lancha mejorada
+  ctx.fillStyle="#fff";
   ctx.beginPath();
-  ctx.moveTo(boat.x, boat.y-25);
-  ctx.lineTo(boat.x+15, boat.y+20);
-  ctx.lineTo(boat.x-15, boat.y+20);
+  ctx.moveTo(boat.x,boat.y-20);
+  ctx.lineTo(boat.x+15,boat.y+20);
+  ctx.lineTo(boat.x-15,boat.y+20);
   ctx.closePath();
   ctx.fill();
+
+  ctx.fillStyle="#ff3b3b";
+  ctx.fillRect(boat.x-12,boat.y+5,24,5);
 }
 
-// ─── LOOP ─────────────────────────
+// ─── LOOP ──────────────────
 function loop(){
   update();
   draw();
   requestAnimationFrame(loop);
 }
-
 loop();
 </script>
-
 </body>
 </html>
