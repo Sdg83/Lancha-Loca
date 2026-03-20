@@ -2,14 +2,10 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Lancha Loca PRO</title>
+<title>Lancha Loca</title>
 <style>
-  body { margin:0; overflow:hidden; background:#0b1d2a; font-family:sans-serif;}
-  canvas { display:block; }
-  #hud {
-    position:fixed; top:10px; left:10px; color:white;
-    font-size:18px; z-index:10;
-  }
+  body{margin:0;overflow:hidden;background:#021e2f;font-family:sans-serif;color:white}
+  #hud{position:absolute;top:10px;left:10px;font-size:14px}
 </style>
 </head>
 <body>
@@ -17,10 +13,9 @@
 <canvas id="game"></canvas>
 
 <div id="hud">
-  <div>Puntos: <span id="score">0</span></div>
-  <div>Nivel: <span id="level">1</span></div>
-  <div>❤️ <span id="lives">3</span></div>
-  <div id="best"></div>
+  Puntos: <span id="score">0</span><br>
+  Nivel: <span id="level">1</span><br>
+  ❤️ <span id="lives">3</span>
 </div>
 
 <script>
@@ -32,238 +27,123 @@ function resize(){
   W = canvas.width = window.innerWidth;
   H = canvas.height = window.innerHeight;
 }
-window.addEventListener("resize", resize);
 resize();
+window.addEventListener("resize", resize);
 
-// ── GAME STATE ─────────────────────────────────
-let boat, items, particles;
+// ─── GAME STATE ─────────────────────
 let score=0, level=1, lives=3;
-let spawnTimer=0, spawnInterval=80;
-let gameOver=false;
+let items=[];
 let frame=0;
 
-// récord
-let best = localStorage.getItem("bestScore") || 0;
-document.getElementById("best").textContent = "🏆 " + best;
+const boat = {
+  x:0,
+  y:0,
+  vx:0,
+  vy:0,
+  w:40,
+  h:60
+};
 
-// ── BOAT ───────────────────────────────────────
-function init(){
-  boat = {x:W/2,y:H-150,vx:0,vy:0,w:40,h:60};
-  items = [];
-  particles = [];
-  score=0; level=1; lives=3;
-  spawnInterval=80;
-  gameOver=false;
-}
+// inicializar posición
+boat.x = W/2;
+boat.y = H-120;
 
-init();
-
-// ── INPUT ──────────────────────────────────────
+// ─── INPUT ─────────────────────────
 let keys={};
-document.addEventListener("keydown",e=>keys[e.key]=true);
-document.addEventListener("keyup",e=>keys[e.key]=false);
 
-// ── SPAWN ──────────────────────────────────────
+document.addEventListener("keydown",e=>{
+  if(e.key==="ArrowLeft")keys.left=true;
+  if(e.key==="ArrowRight")keys.right=true;
+});
+document.addEventListener("keyup",e=>{
+  if(e.key==="ArrowLeft")keys.left=false;
+  if(e.key==="ArrowRight")keys.right=false;
+});
+
+// ─── SPAWN ─────────────────────────
 function spawn(){
-  let type = Math.random();
-
-  if(type < 0.7){
-    // pez
-    items.push({
-      kind:"fish",
-      x:Math.random()*W,
-      y:-50,
-      vx:(Math.random()-0.5)*3,
-      vy:2+Math.random()*2 + level*0.3,
-      pts:10,
-      move: ["normal","zigzag","chase"][Math.floor(Math.random()*3)]
-    });
-  } else {
-    // obstáculo
-    items.push({
-      kind:"rock",
-      x:Math.random()*W,
-      y:-50,
-      vy:3+level*0.4,
-      w:40,h:40
-    });
-  }
+  items.push({
+    x: Math.random()*W,
+    y: -20,
+    vy: 2 + Math.random()*2,
+    size: 10
+  });
 }
 
-// ── MOVIMIENTOS ────────────────────────────────
-function move(o){
-  if(o.kind==="fish"){
-    if(o.move==="zigzag"){
-      o.x += Math.sin(frame*0.1)*3;
-    }
-    else if(o.move==="chase"){
-      let dx = boat.x - o.x;
-      let dy = boat.y - o.y;
-      let ang = Math.atan2(dy,dx);
-      o.x += Math.cos(ang)*1.5;
-      o.y += Math.sin(ang)*1.5;
-      return;
-    }
-    o.y += o.vy;
-    o.x += o.vx;
-  } else {
-    o.y += o.vy;
-  }
-}
-
-// ── COLISIÓN MEJORADA ─────────────────────────
-function collide(a,b){
-  let dx = a.x - b.x;
-  let dy = a.y - b.y;
-  return Math.sqrt(dx*dx+dy*dy) < 30;
-}
-
-// ── EFECTOS ───────────────────────────────────
-function explode(x,y,color){
-  for(let i=0;i<10;i++){
-    particles.push({
-      x,y,
-      vx:(Math.random()-0.5)*6,
-      vy:(Math.random()-0.5)*6,
-      life:40,
-      color
-    });
-  }
-}
-
-function screenShake(){
-  canvas.style.transform =
-    `translate(${Math.random()*6-3}px,${Math.random()*6-3}px)`;
-  setTimeout(()=>canvas.style.transform="translate(0,0)",80);
-}
-
-// ── UPDATE ─────────────────────────────────────
+// ─── UPDATE ────────────────────────
 function update(){
-  if(gameOver) return;
-
   frame++;
-  spawnTimer++;
 
-  if(spawnTimer > spawnInterval){
-    spawn();
-    spawnTimer=0;
-  }
+  if(frame%40===0) spawn();
 
-  // dificultad progresiva
-  spawnInterval = Math.max(30, 80 - level*2);
-
-  // movimiento barco
-  if(keys["ArrowLeft"]) boat.vx -= 0.5;
-  if(keys["ArrowRight"]) boat.vx += 0.5;
-  if(keys["ArrowUp"]) boat.vy -= 0.5;
-  if(keys["ArrowDown"]) boat.vy += 0.5;
+  // movimiento lancha
+  if(keys.left) boat.vx -= 0.5;
+  if(keys.right) boat.vx += 0.5;
 
   boat.vx *= 0.9;
-  boat.vy *= 0.9;
-
   boat.x += boat.vx;
-  boat.y += boat.vy;
 
+  // límites
   boat.x = Math.max(20, Math.min(W-20, boat.x));
-  boat.y = Math.max(20, Math.min(H-20, boat.y));
 
-  // items
-  items.forEach(move);
+  // mover objetos
+  items.forEach(o=>{
+    o.y += o.vy;
+  });
 
   // colisiones
-  items.forEach((o,i)=>{
-    if(collide(boat,o)){
-      if(o.kind==="fish"){
-        score += o.pts;
-        explode(o.x,o.y,"#00ffcc");
-      } else {
-        lives--;
-        explode(o.x,o.y,"red");
-        screenShake();
-        if(navigator.vibrate) navigator.vibrate(100);
-      }
-      items.splice(i,1);
+  items = items.filter(o=>{
+    let hit = Math.abs(o.x - boat.x) < 20 &&
+              Math.abs(o.y - boat.y) < 20;
+
+    if(hit){
+      score += 10;
+      return false;
     }
+
+    return o.y < H+20;
   });
-
-  // limpiar
-  items = items.filter(o=>o.y < H+50);
-
-  // partículas
-  particles.forEach(p=>{
-    p.x+=p.vx;
-    p.y+=p.vy;
-    p.life--;
-  });
-  particles = particles.filter(p=>p.life>0);
-
-  // nivel
-  if(score > level*200){
-    level++;
-  }
-
-  // game over
-  if(lives<=0){
-    gameOver=true;
-    if(score > best){
-      localStorage.setItem("bestScore",score);
-    }
-    setTimeout(()=>alert("Game Over"),100);
-  }
 
   // HUD
   document.getElementById("score").textContent = score;
-  document.getElementById("level").textContent = level;
-  document.getElementById("lives").textContent = lives;
 }
 
-// ── DRAW ──────────────────────────────────────
+// ─── DRAW ──────────────────────────
 function draw(){
-  ctx.fillStyle="#0b1d2a";
+  // fondo agua
+  ctx.fillStyle = "#042c3a";
   ctx.fillRect(0,0,W,H);
 
-  // agua simple
-  ctx.fillStyle="#0f3050";
-  for(let i=0;i<20;i++){
-    ctx.fillRect(i*50,Math.sin(frame*0.05+i)*10+H/2,50,2);
-  }
-
-  // barco
-  ctx.fillStyle="white";
+  // olas simples
+  ctx.strokeStyle="#0a4a66";
   ctx.beginPath();
-  ctx.arc(boat.x,boat.y,15,0,Math.PI*2);
-  ctx.fill();
+  for(let i=0;i<W;i+=20){
+    ctx.lineTo(i, H/2 + Math.sin(i*0.05+frame*0.05)*5);
+  }
+  ctx.stroke();
 
-  // items
+  // peces
+  ctx.fillStyle="#2ee6c5";
   items.forEach(o=>{
-    if(o.kind==="fish"){
-      ctx.fillStyle="#00ffcc";
-      ctx.beginPath();
-      ctx.arc(o.x,o.y,10,0,Math.PI*2);
-      ctx.fill();
-    } else {
-      ctx.fillStyle="#888";
-      ctx.fillRect(o.x-15,o.y-15,30,30);
-    }
+    ctx.beginPath();
+    ctx.arc(o.x,o.y,o.size,0,Math.PI*2);
+    ctx.fill();
   });
 
-  // partículas
-  particles.forEach(p=>{
-    ctx.globalAlpha = p.life/40;
-    ctx.fillStyle = p.color;
-    ctx.fillRect(p.x,p.y,4,4);
-    ctx.globalAlpha = 1;
-  });
+  // lancha (simple pero visible)
+  ctx.fillStyle="white";
+  ctx.fillRect(boat.x-10, boat.y-20, 20, 40);
 }
 
-// ── LOOP ──────────────────────────────────────
+// ─── LOOP ──────────────────────────
 function loop(){
   update();
   draw();
   requestAnimationFrame(loop);
 }
-loop();
 
+loop();
 </script>
+
 </body>
 </html>
