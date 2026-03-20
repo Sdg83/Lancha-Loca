@@ -2,91 +2,117 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
 <title>Lancha Loca</title>
+
 <style>
-  body{margin:0;overflow:hidden;background:#021e2f;font-family:sans-serif;color:white}
-  #hud{position:absolute;top:10px;left:10px;font-size:14px}
+html,body{
+  margin:0;
+  padding:0;
+  overflow:hidden;
+  background:#021e2f;
+  touch-action:none;
+}
+
+#hud{
+  position:absolute;
+  top:10px;
+  left:10px;
+  color:white;
+  font-family:sans-serif;
+  font-size:14px;
+}
 </style>
 </head>
+
 <body>
 
 <canvas id="game"></canvas>
 
 <div id="hud">
   Puntos: <span id="score">0</span><br>
-  Nivel: <span id="level">1</span><br>
-  ❤️ <span id="lives">3</span>
+  Nivel: 1<br>
+  ❤️ 3
 </div>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-let W, H;
+let DPR = window.devicePixelRatio || 1;
+let W,H;
+
 function resize(){
-  W = canvas.width = window.innerWidth;
-  H = canvas.height = window.innerHeight;
+  W = window.innerWidth;
+  H = window.innerHeight;
+
+  canvas.style.width = W + "px";
+  canvas.style.height = H + "px";
+
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+
+  ctx.setTransform(DPR,0,0,DPR,0,0);
 }
 resize();
 window.addEventListener("resize", resize);
 
-// ─── GAME STATE ─────────────────────
-let score=0, level=1, lives=3;
-let items=[];
-let frame=0;
+// ─── GAME ─────────────────────────
+let score = 0;
+let items = [];
+let frame = 0;
 
 const boat = {
-  x:0,
-  y:0,
-  vx:0,
-  vy:0,
-  w:40,
-  h:60
+  x: W/2,
+  y: H-120,
+  vx:0
 };
 
-// inicializar posición
-boat.x = W/2;
-boat.y = H-120;
+// ─── INPUT TOUCH (IPHONE) ─────────
+let touchX = null;
 
-// ─── INPUT ─────────────────────────
-let keys={};
-
-document.addEventListener("keydown",e=>{
-  if(e.key==="ArrowLeft")keys.left=true;
-  if(e.key==="ArrowRight")keys.right=true;
-});
-document.addEventListener("keyup",e=>{
-  if(e.key==="ArrowLeft")keys.left=false;
-  if(e.key==="ArrowRight")keys.right=false;
+window.addEventListener("touchstart", e=>{
+  touchX = e.touches[0].clientX;
 });
 
-// ─── SPAWN ─────────────────────────
+window.addEventListener("touchmove", e=>{
+  touchX = e.touches[0].clientX;
+});
+
+window.addEventListener("touchend", ()=>{
+  touchX = null;
+});
+
+// ─── SPAWN ────────────────────────
 function spawn(){
   items.push({
     x: Math.random()*W,
     y: -20,
-    vy: 2 + Math.random()*2,
-    size: 10
+    vy: 3,
+    r: 8
   });
 }
 
-// ─── UPDATE ────────────────────────
+// ─── UPDATE ───────────────────────
 function update(){
   frame++;
 
-  if(frame%40===0) spawn();
+  if(frame%30===0) spawn();
 
-  // movimiento lancha
-  if(keys.left) boat.vx -= 0.5;
-  if(keys.right) boat.vx += 0.5;
+  // mover lancha con touch
+  if(touchX !== null){
+    let dx = touchX - boat.x;
+    boat.vx += dx * 0.01;
+  }
 
   boat.vx *= 0.9;
   boat.x += boat.vx;
 
   // límites
-  boat.x = Math.max(20, Math.min(W-20, boat.x));
+  boat.x = Math.max(30, Math.min(W-30, boat.x));
 
-  // mover objetos
+  // objetos
   items.forEach(o=>{
     o.y += o.vy;
   });
@@ -98,44 +124,50 @@ function update(){
 
     if(hit){
       score += 10;
+      document.getElementById("score").textContent = score;
       return false;
     }
 
     return o.y < H+20;
   });
-
-  // HUD
-  document.getElementById("score").textContent = score;
 }
 
-// ─── DRAW ──────────────────────────
+// ─── DRAW ─────────────────────────
 function draw(){
   // fondo agua
-  ctx.fillStyle = "#042c3a";
+  let grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,"#06364d");
+  grad.addColorStop(1,"#021e2f");
+  ctx.fillStyle = grad;
   ctx.fillRect(0,0,W,H);
 
-  // olas simples
-  ctx.strokeStyle="#0a4a66";
+  // olas
+  ctx.strokeStyle = "rgba(255,255,255,0.1)";
   ctx.beginPath();
-  for(let i=0;i<W;i+=20){
-    ctx.lineTo(i, H/2 + Math.sin(i*0.05+frame*0.05)*5);
+  for(let i=0;i<W;i+=10){
+    ctx.lineTo(i, H/2 + Math.sin(i*0.02 + frame*0.05)*5);
   }
   ctx.stroke();
 
-  // peces
-  ctx.fillStyle="#2ee6c5";
+  // peces (visibles)
   items.forEach(o=>{
+    ctx.fillStyle="#2ee6c5";
     ctx.beginPath();
-    ctx.arc(o.x,o.y,o.size,0,Math.PI*2);
+    ctx.arc(o.x,o.y,o.r,0,Math.PI*2);
     ctx.fill();
   });
 
-  // lancha (simple pero visible)
+  // LANCHA (GRANDE Y VISIBLE)
   ctx.fillStyle="white";
-  ctx.fillRect(boat.x-10, boat.y-20, 20, 40);
+  ctx.beginPath();
+  ctx.moveTo(boat.x, boat.y-25);
+  ctx.lineTo(boat.x+15, boat.y+20);
+  ctx.lineTo(boat.x-15, boat.y+20);
+  ctx.closePath();
+  ctx.fill();
 }
 
-// ─── LOOP ──────────────────────────
+// ─── LOOP ─────────────────────────
 function loop(){
   update();
   draw();
